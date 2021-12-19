@@ -4,205 +4,74 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 01b31475-d4de-4b4b-8988-462e27c55251
+# ╔═╡ 01801014-3f97-4d44-bb9a-751783e1f6e4
 using Turing, Distributions, MCMCChains, CairoMakie, StatsPlots, CSV, DataFrames, DataFramesMeta
 
-# ╔═╡ 9811f07c-6086-11ec-19b2-6b7b7b2b0348
+# ╔═╡ 3f080e86-608a-11ec-066c-950563989fc7
 md"""
-## 7.2 対数をとるか否か
+## 7.5 交絡
 """
 
-# ╔═╡ d5104bf6-c316-4bdb-a6e0-f67d09fbb8d4
+# ╔═╡ 9238a0db-0c5f-4d13-b406-d2cd303152f8
 set_theme!(Theme(Axis=(xgridstyle=:dot, ygridstyle=:dot, xgridcolor=:gray30, ygridcolor=:gray30)))
 
-# ╔═╡ 0fec7190-baab-466d-8b13-f0ea669aa0dc
-d = CSV.read("../input/data-rental.txt", DataFrame)
+# ╔═╡ 77bf2c7e-334d-404e-99e9-820e7b045ebf
+d = CSV.read("../input/data-50m.txt", DataFrame)
 
-# ╔═╡ dca1022c-0838-4f0c-be90-28c18e908388
-let
-	fig = Figure()
-	ax1 = Axis(fig[1,1], xlabel="Area", ylabel="Y")
-	ax2 = Axis(fig[2,1], xlabel="Area", ylabel="Y", xscale=log10, yscale=log10)
-	CairoMakie.scatter!(ax1, d.Area, d.Y)
-	CairoMakie.scatter!(ax2, d.Area, d.Y)
-
-	fig
-end
-
-# ╔═╡ 2e4e76bc-26e0-47f7-9e7e-dc853165eb06
+# ╔═╡ 50231e76-c971-43fd-b6fc-31979c8ad556
 begin
-	X = d[:,:Area]
+	X= d[:,Not(:Y)]
 	Y = d[:,:Y]
 end
 
-# ╔═╡ 023449f5-9061-4b65-8f91-3ab06895f9e5
-@model function linear_regression(X,Y)
-	b1 ~ Normal(0, 100)
-	b2 ~ Normal(0, 100)
-	σ ~ truncated(Normal(0, 100), 0, Inf)
+# ╔═╡ df76474d-aed2-4743-9cb5-5919419fc81c
+let
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="weight", ylabel="Y")
 	
-	μ = Vector(undef, size(X,1))
+	for a in unique(d.Age)
+		tmpdf = @subset(d, :Age .== a)
+		CairoMakie.scatter!(ax, tmpdf.Weight, tmpdf.Y, label="$(a)")
+	end
+	axislegend("Age"; position=:rb)
+	fig
+end
+
+# ╔═╡ 158861f1-a65c-4d7f-85e1-c8be10c6f937
+@model function confounding(X,Y)
+	c_intercept ~ Normal(0, 1)
+	c_age ~ Normal(0, 1)
+	σw ~ truncated(Normal(0, 10), 0, Inf)
+
+	b_intercept ~ Normal(0, 1)
+	b_age ~ Normal(0, 1)
+	b_weight ~ Normal(0, 1)
+	σy ~ truncated(Normal(0, 10), 0, Inf)
+
+	μw = Vector(undef, size(X,1))
+	μy = Vector(undef, size(X,1))
+	weight = Vector(undef, size(X,1))
 	
 	for n in 1:size(X,1)
-		μ[n] = b1 + b2 * X[n]
-		Y[n] ~ Normal(μ[n], σ)
+		μw[n] = c_intercept + c_age * X[n, :Age]
+		weight[n] ~ Normal(μw[n], σw)
+		μy[n] = b_intercept + b_age * X[n, :Age] + b_weight * X[n,:Weight]
+		Y[n] ~ Normal(μy[n], σy)
 	end
+	return μw, μy
 end
 
-# ╔═╡ dcfb7789-f686-42b9-94d6-8602cbceb31f
-modelA = linear_regression(X, Y)
+# ╔═╡ ca2a411b-3dda-445e-8fe5-300c7881e136
+model = confounding(X, Y)
 
-# ╔═╡ b8bac007-5ac9-4ae9-9eb2-e8a6119f74be
-chainA = sample(modelA, NUTS(0.65), MCMCThreads(), 1_000, 3)
+# ╔═╡ 9b4e35df-86cd-48c0-939e-3cdb8b217a24
+chain = sample(model, NUTS(0.65), MCMCThreads(), 1_000, 4)
 
-# ╔═╡ 0202b360-0d60-4128-8b7b-fbefba33973c
-describe(chainA)
+# ╔═╡ cd719c75-8d09-44df-acd8-8a2900823a67
+describe(chain)
 
-# ╔═╡ e2389c4a-b1d7-480b-9a31-29013065e7e2
-StatsPlots.plot(chainA)
-
-# ╔═╡ ddc6291d-4a9b-4097-8a49-17948f46608e
-md"""
-#### 対数をとる
-
-p.105のモデル式7-2 `ln(Y[n]) ~ Normal(μ[n], σ)`のような書き方は現在のTuringではできなさげなので、普通にX, Yの対数をとって同じモデル式に流し込む形。
-
-"""
-
-# ╔═╡ 26f70154-83a0-4bc7-bc19-a50bc113f481
-begin
-	Xl = log10.(X)
-	Yl = log10.(Y)
-end
-
-# ╔═╡ 0b9a79e0-b1ef-44bd-84c3-8b7ddc07cdea
-modelB = linear_regression(Xl, Yl)
-
-# ╔═╡ 59fb20cf-1d2b-484d-bdd9-b6bb6c97865b
-chainB = sample(modelB, NUTS(0.65), MCMCThreads(), 1_000, 3)
-
-# ╔═╡ 16c2dd18-29de-4399-ac18-16deaacdbfcf
-describe(chainB)
-
-# ╔═╡ 25cb2483-c62b-4c70-a794-7fbb89c058c8
-StatsPlots.plot(chainB)
-
-# ╔═╡ ac193c1c-7893-4d9b-9328-7f753a2d1087
-md"""
-#### 図を用いた検証
-"""
-
-# ╔═╡ 09d5acf7-3c53-4b57-8fd4-0ebbf98fbc70
-let
-	fig = Figure()
-	ax = Axis(fig[1,1], xlabel="Area", ylabel="Y")
-	
-	for i in 1:1000
-		b1a = chainA[i,:b1,1]
-		b2a = chainA[i,:b2,1]
-		f(x) = b1a + b2a * x
-
-		b1b = chainB[i,:b1,1]
-		b2b = chainB[i,:b2,1]
-		g(x) = 10^(b1b + b2b * log10(x))
-
-		xs = range(10, 120, length=50)
-
-		CairoMakie.lines!(ax, xs, f.(xs), color=RGBA(0, 0, 1, 0.02))
-		CairoMakie.lines!(ax, xs, g.(xs), color=RGBA(1, 0, 0, 0.02))
-	end
-
-	CairoMakie.scatter!(ax, X, Y, color=RGBA(0,0,0,1))
-
-	fig
-end
-
-# ╔═╡ 147ded37-4720-4d3e-8c01-6ce7d0f5842e
-md"""
-予測値と実測値のプロット
-"""
-
-# ╔═╡ e5993c00-9086-42c1-845f-21c8b5f0562d
-function errors(X,chain; mode=false)
-	
-	bs = DataFrame([quantile(chain[:,key,1], [0.2, 0.5, 0.8]) 
-		for key in [:b1 ,:b2]],　[:b1, :b2])
-	if !mode
-		pred20 = bs[1,:b1] .+ bs[1,:b2] .* X
-		pred50 = bs[2,:b1] .+ bs[2,:b2] .* X
-		pred80 = bs[3,:b1] .+ bs[3,:b2] .* X
-	else
-		pred20 = 10 .^(bs[1,:b1] .+ bs[1,:b2] .* log10.(X))
-		pred50 = 10 .^(bs[2,:b1] .+ bs[2,:b2] .* log10.(X))
-		pred80 = 10 .^(bs[3,:b1] .+ bs[3,:b2] .* log10.(X))
-	end
-		
-	lerror = pred50 .- pred20
-	herror = pred80 .- pred50
-
-	pred50, lerror, herror
-end
-
-# ╔═╡ ff020985-dd67-49f1-8f85-d5cbd6f4825f
-let
-	fig = Figure()
-	ax1 = Axis(fig[1,1], xlabel="obs", ylabel="pred")
-
-	pred50A, lerrorA, herrorA = errors(X, chainA[:,:,1], mode = false)
-
-	CairoMakie.scatter!(ax1, Y, pred50A)
-	CairoMakie.errorbars!(ax1, Y, pred50A, lerrorA, herrorA)
-	CairoMakie.lines!(ax1, [0, 1800], [0, 1800]; linestyle=:dot)
-
-
-	ax2 = Axis(fig[2,1], xlabel="obs", ylabel="pred")
-	pred50B, lerrorB, herrorB = errors(X, chainB[:,:,1], mode=true)
-	
-	CairoMakie.scatter!(ax2, Y, pred50B)
-	CairoMakie.errorbars!(ax2, Y, pred50B, lerrorB, herrorB)
-	CairoMakie.lines!(ax2, [0, 1800], [0, 1800]; linestyle=:dot)
-
-	fig
-end
-
-# ╔═╡ 6ec02991-3849-455e-98fe-d2985e00288b
-md"""
-ノイズの可視化
-"""
-
-# ╔═╡ 19dc708e-51ff-43ff-bc4a-2f1f36fafce5
-
-
-# ╔═╡ 720207c5-02d3-4dcd-9255-1a382ccd0d25
-let
-	fig = Figure()
-	ax11 = Axis(fig[1,1], xlabel="value", ylabel="count")
-	ax12 = Axis(fig[1,1], yaxisposition=:right)
-	hidespines!(ax12)
-	linkxaxes!(ax11, ax12)
-
-	pred50a, _, _ = errors(X, chainA[:,:,1], mode=false)
-	CairoMakie.hist!(ax11, Y .- pred50a)
-	xsA = range(-300, 500, length=100)
-	CairoMakie.lines!(ax12, xsA, pdf.(Normal(0, mean(chainA[:,:σ,:])), xsA))
-
-	
-	ax21 = Axis(fig[2,1], xlabel="value", ylabel="count")
-	ax22 = Axis(fig[2,1], yaxisposition=:right)
-	linkxaxes!(ax21, ax22)
-	
-	bs = [quantile(chainB[:,key,1], 0.5) for key in [:b1 ,:b2]]
-	pred50b = bs[1] .+ bs[2] .* Xl
-		
-	CairoMakie.hist!(ax21, Yl .- pred50b)
-	xsB = range(-0.5, 0.5, length=100)
-	CairoMakie.lines!(ax22, xsB, pdf.(Normal(0, mean(chainB[:,:σ,:])), xsB))
-	
-	fig
-end
-
-# ╔═╡ 02cfcaf7-5e9a-4b51-af14-c1d6355e00cc
-
+# ╔═╡ 05f09fa5-f748-4290-beb8-ec9e4ff8889b
+StatsPlots.plot(chain[:,[:c_intercept, :c_age, :b_intercept, :b_age, :b_weight], :])
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1972,31 +1841,16 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─9811f07c-6086-11ec-19b2-6b7b7b2b0348
-# ╠═01b31475-d4de-4b4b-8988-462e27c55251
-# ╠═d5104bf6-c316-4bdb-a6e0-f67d09fbb8d4
-# ╠═0fec7190-baab-466d-8b13-f0ea669aa0dc
-# ╠═dca1022c-0838-4f0c-be90-28c18e908388
-# ╠═2e4e76bc-26e0-47f7-9e7e-dc853165eb06
-# ╠═023449f5-9061-4b65-8f91-3ab06895f9e5
-# ╠═dcfb7789-f686-42b9-94d6-8602cbceb31f
-# ╠═b8bac007-5ac9-4ae9-9eb2-e8a6119f74be
-# ╠═0202b360-0d60-4128-8b7b-fbefba33973c
-# ╠═e2389c4a-b1d7-480b-9a31-29013065e7e2
-# ╠═ddc6291d-4a9b-4097-8a49-17948f46608e
-# ╠═26f70154-83a0-4bc7-bc19-a50bc113f481
-# ╠═0b9a79e0-b1ef-44bd-84c3-8b7ddc07cdea
-# ╠═59fb20cf-1d2b-484d-bdd9-b6bb6c97865b
-# ╠═16c2dd18-29de-4399-ac18-16deaacdbfcf
-# ╠═25cb2483-c62b-4c70-a794-7fbb89c058c8
-# ╠═ac193c1c-7893-4d9b-9328-7f753a2d1087
-# ╠═09d5acf7-3c53-4b57-8fd4-0ebbf98fbc70
-# ╠═147ded37-4720-4d3e-8c01-6ce7d0f5842e
-# ╠═e5993c00-9086-42c1-845f-21c8b5f0562d
-# ╠═ff020985-dd67-49f1-8f85-d5cbd6f4825f
-# ╠═6ec02991-3849-455e-98fe-d2985e00288b
-# ╠═19dc708e-51ff-43ff-bc4a-2f1f36fafce5
-# ╠═720207c5-02d3-4dcd-9255-1a382ccd0d25
-# ╠═02cfcaf7-5e9a-4b51-af14-c1d6355e00cc
+# ╠═3f080e86-608a-11ec-066c-950563989fc7
+# ╠═01801014-3f97-4d44-bb9a-751783e1f6e4
+# ╠═9238a0db-0c5f-4d13-b406-d2cd303152f8
+# ╠═77bf2c7e-334d-404e-99e9-820e7b045ebf
+# ╠═50231e76-c971-43fd-b6fc-31979c8ad556
+# ╠═df76474d-aed2-4743-9cb5-5919419fc81c
+# ╠═158861f1-a65c-4d7f-85e1-c8be10c6f937
+# ╠═ca2a411b-3dda-445e-8fe5-300c7881e136
+# ╠═9b4e35df-86cd-48c0-939e-3cdb8b217a24
+# ╠═cd719c75-8d09-44df-acd8-8a2900823a67
+# ╠═05f09fa5-f748-4290-beb8-ec9e4ff8889b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
