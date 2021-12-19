@@ -180,8 +180,8 @@ end
 model_c = logistic_regression2(X_c, Y)
 
 # ╔═╡ eb8dc184-e3c5-47d4-978a-6cfd50daba8d
+## this may take 10~ mins
 chain_c = sample(model_c, NUTS(0.65), MCMCThreads(), 1_000, 3)
-
 
 # ╔═╡ de50a45a-5084-481b-98f2-fd49f23135c1
 describe(chain_c)
