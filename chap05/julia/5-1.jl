@@ -26,9 +26,6 @@ md"""
 ### 5.1.2 データの分布の確認
 """
 
-# ╔═╡ 19e47abb-cad4-4387-acbb-17fd4744c3fe
-
-
 # ╔═╡ c7e3d297-e8ec-4a50-9f03-e7139201d57a
 StatsPlots.corrplot(Array(d))
 
@@ -40,12 +37,11 @@ Y = d[:,:Y]
 
 # ╔═╡ b48ac2b3-ba19-4169-a31e-730894ae90e5
 md"""
-5.1.5' Turingで実装
+### 5.1.5' Turingで実装
 """
 
 # ╔═╡ 5f6a0193-ace1-4812-9b19-645f14901fe9
 @model function mv_linear_regression(X, Y)
-	#w ~ MvNormal(size(X,2), 100)
 	b1 ~ Normal(0, 100)
 	b2 ~ Normal(0, 100)
 	b3 ~ Normal(0, 100)
@@ -57,11 +53,7 @@ md"""
 		μ[n] = b1 + b2 * X[n,:A] + b3 * X[n,:Score]
 		Y[n] ~ Normal(μ[n], sqrt(σ))
 	end
-	return μ
 end
-
-# ╔═╡ d0fbc990-8b83-49a3-a1de-317e779a0464
-
 
 # ╔═╡ aeeb56a4-c5f7-4133-b59e-bb5392d810d3
 model = mv_linear_regression(X, Y)
@@ -167,13 +159,39 @@ MCMCサンプルの散布図行列
 corner(chain)
 
 # ╔═╡ f0f33e88-a607-437b-8b41-3be1e316cb17
+md"""
+#### 練習問題(2)
+"""
 
+# ╔═╡ 229e3d99-760a-41f8-86ed-6a18f59eb7ab
+@model function mv_linear_regression2(X, Y)
+	b1 ~ Normal(0, 100)
+	b2 ~ Normal(0, 100)
+	b3 ~ Normal(0, 100)
+	
+	σ ~ truncated(Normal(0, 100), 0, Inf)
+
+	μ = Vector(undef, size(X,1))
+	for n in 1:size(X,1)
+		μ[n] = b1 + b2 * X[n,:A] + b3 * X[n,:Score]
+		Y[n] ~ Normal(μ[n], sqrt(σ))
+	end
+	# exercise (2)
+	return Y .- μ
+end
 
 # ╔═╡ 3e7e1d6a-e59d-42c4-83c2-2417258fe238
+model2 = mv_linear_regression2(X, Y)
 
+# ╔═╡ b7925422-9403-47be-b4d8-0c8e6dec376d
+chain2 = sample(model2, NUTS(0.65), MCMCThreads(), 1_000, 3)
 
-# ╔═╡ a48b999a-9f04-4a21-9efe-711811600abc
+# ╔═╡ c4f09c18-fcab-42e1-92a5-026dac9746e4
+ϵ = generated_quantities(model2, chain2)
 
+# ╔═╡ c02d599d-93d5-4182-808c-0023c7af0d43
+# MCMC samples from chain 1
+ϵ[:,1]
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -359,9 +377,9 @@ version = "0.6.6"
 
 [[Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "f2202b55d816427cd385a9a4f3ffb226bee80f99"
+git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
-version = "1.16.1+0"
+version = "1.16.1+1"
 
 [[Chain]]
 git-tree-sha1 = "339237319ef4712e6e5df7758d0bccddf5c237d9"
@@ -740,9 +758,9 @@ version = "0.21.0+0"
 
 [[Glib_jll]]
 deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE_jll", "Pkg", "Zlib_jll"]
-git-tree-sha1 = "74ef6288d071f58033d54fd6708d4bc23a8b8972"
+git-tree-sha1 = "a32d672ac2c967f3deb8a81d828afc739c838a06"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
-version = "2.68.3+1"
+version = "2.68.3+2"
 
 [[Graphics]]
 deps = ["Colors", "LinearAlgebra", "NaNMath"]
@@ -1949,13 +1967,11 @@ version = "0.9.1+5"
 # ╠═a7414b1d-d3c2-4e01-a594-60ba58ec9e8f
 # ╠═d8f942f2-995d-44a6-bfd9-224b368c8787
 # ╠═264e1e06-1f28-40ee-8536-5ba2c855b7e2
-# ╠═19e47abb-cad4-4387-acbb-17fd4744c3fe
 # ╠═c7e3d297-e8ec-4a50-9f03-e7139201d57a
 # ╠═7b9f1389-2215-4ab9-976b-a3fe0c4e34e5
 # ╠═81659397-6f1c-45f9-9853-40f8f1eaa3f7
-# ╟─b48ac2b3-ba19-4169-a31e-730894ae90e5
+# ╠═b48ac2b3-ba19-4169-a31e-730894ae90e5
 # ╠═5f6a0193-ace1-4812-9b19-645f14901fe9
-# ╠═d0fbc990-8b83-49a3-a1de-317e779a0464
 # ╠═aeeb56a4-c5f7-4133-b59e-bb5392d810d3
 # ╠═7f44bcd8-3d55-41d9-8bec-840e48ed8903
 # ╠═789926ad-d7e9-4da5-8592-779556f8edc1
@@ -1969,7 +1985,10 @@ version = "0.9.1+5"
 # ╠═b221a5f7-1a71-4062-a777-1ed502edd09b
 # ╠═a5088f56-210b-41e5-a9d1-5edfb776ab45
 # ╠═f0f33e88-a607-437b-8b41-3be1e316cb17
+# ╠═229e3d99-760a-41f8-86ed-6a18f59eb7ab
 # ╠═3e7e1d6a-e59d-42c4-83c2-2417258fe238
-# ╠═a48b999a-9f04-4a21-9efe-711811600abc
+# ╠═b7925422-9403-47be-b4d8-0c8e6dec376d
+# ╠═c4f09c18-fcab-42e1-92a5-026dac9746e4
+# ╠═c02d599d-93d5-4182-808c-0023c7af0d43
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
