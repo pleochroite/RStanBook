@@ -12,6 +12,9 @@ md"""
 #### 練習問題(7)
 """
 
+# ╔═╡ 199c1f1f-865b-463c-a413-270748bd5222
+sig(x) = 1/(1+exp(-x))
+
 # ╔═╡ 562b5856-01cc-4e20-8c8a-50d45daee7b9
 d = CSV.read("../input/data4a.csv", DataFrame)
 
@@ -52,6 +55,9 @@ model = binomial_logistic_regression(X, Y)
 
 # ╔═╡ f6c51f5b-a9f5-4de9-9a47-4abd9c0fde65
 chain = sample(model, NUTS(0.65), MCMCThreads(), 1_000, 3)
+
+# ╔═╡ 576785c1-88d5-4478-9c67-4f3d58c1ec64
+
 
 # ╔═╡ b43d3e85-23b0-47c2-9692-8ff0e530a332
 describe(chain)
@@ -1832,12 +1838,14 @@ version = "0.9.1+5"
 # ╔═╡ Cell order:
 # ╠═f4307060-6084-11ec-359c-61a9c44ce68e
 # ╠═3d630faa-8c56-4b5a-8df1-baab8bf03171
+# ╠═199c1f1f-865b-463c-a413-270748bd5222
 # ╠═562b5856-01cc-4e20-8c8a-50d45daee7b9
 # ╠═dfa5d9ca-bdf9-4501-aa20-ff83a4aaa9c0
 # ╠═b1742bfa-c377-42a9-858b-90e17c682112
 # ╠═c2f0fa3b-6299-4444-b341-286ba315b933
 # ╠═706a8030-8e12-46eb-9585-3ced2fad6be8
 # ╠═f6c51f5b-a9f5-4de9-9a47-4abd9c0fde65
+# ╠═576785c1-88d5-4478-9c67-4f3d58c1ec64
 # ╠═b43d3e85-23b0-47c2-9692-8ff0e530a332
 # ╠═16beff14-d12a-4ac0-abb5-ffb89cfdf63f
 # ╠═66a8cf8d-5575-48a1-bfd8-c240f3491c71
