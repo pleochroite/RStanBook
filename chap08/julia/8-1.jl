@@ -41,7 +41,7 @@ let
 	
 	for k in unique(d.KID)
 		_tmpdf = @subset(d, :KID .== k)
-		CairoMakie.scatter!(ax, _tmpdf.X, _tmpdf.Y; label="$(k)", markersize=20)
+		CairoMakie.scatter!(ax, _tmpdf.X, _tmpdf.Y; label="$(k)", markersize=15)
 	end
 	axislegend("KID"; position=:lt)
 	fig
