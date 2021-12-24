@@ -76,7 +76,7 @@ let
 		a = coef(m)[1]
 		b = coef(m)[2]
 		g(x) = a + b * x
-		CairoMakie.lines!(ax[i], xs, g.(xs), color=RGBA(1,0,0,0.5), width=5)
+		CairoMakie.lines!(ax[i], xs, g.(xs), color=RGBA(1,0,0,0.5), linewidth=5)
 
 		CairoMakie.lines!(ax[i], xs, f.(xs), linewidth=15, color=RGBA(0.3,0.3,0.3,0.5))
 	end
@@ -111,10 +111,15 @@ md"""
 		ak[k] ~ Normal(ag[K2G[k,:GID]], σa)
 		bk[k] ~ Normal(bg[K2G[k,:GID]], σb)
 	end
-	
+
+	μ = Vector(undef, size(X,1))
 	for n ∈ 1:size(X,1)
-		Y[n] ~ Normal(ak[X[n,:KID]] + bk[X[n,:KID]] * X[n,:X], σy)
+		μ[n] = ak[X[n,:KID]] + bk[X[n,:KID]] * X[n,:X]
+		Y[n] ~ Normal(μ[n], σy)
 	end
+
+	return μ
+	
 end
 
 # ╔═╡ 687beb66-aecc-4476-a466-e4b545ad718f
@@ -131,13 +136,65 @@ describe(chain_hierarchies1)
 StatsPlots.plot(chain_hierarchies1[:,[:a0, :b0, :σag, :σbg, Symbol("ag[1]"), Symbol("ag[2]"), Symbol("ag[3]"), Symbol("bg[1]"), Symbol("bg[2]"), Symbol("bg[3]"), :σa, :σb, :σy],:])
 
 # ╔═╡ 87917e20-40e8-4cda-acc1-d176a63ffe98
+let
+	cycle = Cycle([:marker, :color], covary=true)
+	update_theme!(Scatter=(;cycle=cycle,), Lines=(;cycle=cycle))
+	
+	fig = Figure(resolution=(1000, 1000))
+	ax = [Axis(fig[i, j]) for i ∈ 1:5, j ∈ 1:6]
 
+	xs = range(0, 35, length=70)
+
+	glm_all = glm(@formula(Y ~ X), d, Normal(), IdentityLink())
+	aa = coef(glm_all)[1]
+	ba = coef(glm_all)[2]
+	f(x) = aa + ba * x
+
+	K2G = unique(d[:,[:KID,:GID]])
+	for g ∈ unique(K2G.GID)
+		_KinG = @subset(K2G, :GID .== g)
+		for k ∈ _KinG.KID
+			_tmpdf = @subset(d, :KID .== k)
+			CairoMakie.scatter!(ax[k], _tmpdf.X, _tmpdf.Y, label="$(k)", 
+				markersize=15)
+			
+			a = median(chain_hierarchies1[:,Symbol("ak[$(k)]"),:])
+			b = median(chain_hierarchies1[:,Symbol("bk[$(k)]"),:])
+			fk(x) = a + b * x
+			CairoMakie.lines!(ax[k], xs, fk.(xs), color=RGBA(1,0,0,0.5), linewidth=5)
+
+			CairoMakie.lines!(ax[k], xs, f.(xs), linewidth=8, 
+				color=RGBA(0.3,0.3,0.3,0.3))
+		end
+	end
+	rowgap!(fig.layout, 2)
+	colgap!(fig.layout, 2)
+	fig
+end	
+
+# ╔═╡ bac59d95-50b3-4e03-9ee1-9951d0becc43
+μ = generated_quantities(model_hierarchies1, chain_hierarchies1)
+
+
+# ╔═╡ c2e90f57-3e7b-41ba-ab82-865feecdf707
+median(chain_hierarchies1[:,:σy,:])
 
 # ╔═╡ 32353023-9dc6-4268-a7d6-8fb0078dd9d6
+let
+	ϵ =  mean(μ) .- Y
 
+	fig = Figure()
+	ax1 = Axis(fig[1,1], xlabel="value", ylabel="count")
+	ax2 = Axis(fig[1,1], yaxisposition=:right)
 
-# ╔═╡ b284914c-717d-4f16-a749-22ab915fcd58
+	CairoMakie.hist!(ax1, ϵ)
 
+	σy = median(chain_hierarchies1[:,:σy,:])
+	xs = range(-200, 200, length=100)
+	CairoMakie.lines!(ax2, xs, pdf.(Normal(0, σy), xs))
+
+	fig
+end
 
 # ╔═╡ 37f30c1f-c32f-4fb8-b189-9538b4f733ca
 @model function hierarchies2(X, Y, K2G)
@@ -1988,8 +2045,9 @@ version = "0.9.1+5"
 # ╠═83dd23b3-4d0c-4051-96a9-07cd9826436d
 # ╠═9b367864-6373-44ad-b63a-19d73b2fad3b
 # ╠═87917e20-40e8-4cda-acc1-d176a63ffe98
+# ╠═bac59d95-50b3-4e03-9ee1-9951d0becc43
+# ╠═c2e90f57-3e7b-41ba-ab82-865feecdf707
 # ╠═32353023-9dc6-4268-a7d6-8fb0078dd9d6
-# ╠═b284914c-717d-4f16-a749-22ab915fcd58
 # ╠═37f30c1f-c32f-4fb8-b189-9538b4f733ca
 # ╠═4bed9095-a14d-428c-937a-1adc5f73b3a2
 # ╠═331065bc-5de7-47ba-974e-b2141b4e7c72
