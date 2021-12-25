@@ -141,9 +141,6 @@ StatsPlots.plot(chain_hierarchies1[:,[:a0, :b0, :σag, :σbg, Symbol("ag[1]"), S
 
 # ╔═╡ 87917e20-40e8-4cda-acc1-d176a63ffe98
 let
-	cycle = Cycle([:marker, :color], covary=true)
-	update_theme!(Scatter=(;cycle=cycle,), Lines=(;cycle=cycle))
-	
 	fig = Figure(resolution=(1000, 1000))
 	ax = [Axis(fig[j, i], limits=(0,35,0,1600),
 		title="KID: $(i + (j-1)*5)") for i ∈ 1:5, j ∈ 1:6]
