@@ -59,7 +59,8 @@ end
 # ╔═╡ c467f914-6857-44f0-aea7-0b05cb54ac69
 let
 	fig = Figure()
-	ax = [Axis(fig[1, i], xlabel="X", ylabel="Y", title="GID: $(i)") for i in 1:3]
+	ax = [Axis(fig[1, i], xlabel="X", ylabel="Y", 
+		limits=(0,35,0,1600),title="GID: $(i)") for i in 1:3]
 
 	xs = range(0, 35, length=70)
 
@@ -79,6 +80,9 @@ let
 		CairoMakie.lines!(ax[i], xs, g.(xs), color=RGBA(1,0,0,0.5), linewidth=5)
 
 		CairoMakie.lines!(ax[i], xs, f.(xs), linewidth=15, color=RGBA(0.3,0.3,0.3,0.5))
+		if i ≠ 1
+			hideydecorations!(ax[i], ticks=false, grid=false)
+		end
 	end
 	
 	fig
@@ -141,7 +145,8 @@ let
 	update_theme!(Scatter=(;cycle=cycle,), Lines=(;cycle=cycle))
 	
 	fig = Figure(resolution=(1000, 1000))
-	ax = [Axis(fig[i, j]) for i ∈ 1:5, j ∈ 1:6]
+	ax = [Axis(fig[j, i], limits=(0,35,0,1600),
+		title="KID: $(i + (j-1)*5)") for i ∈ 1:5, j ∈ 1:6]
 
 	xs = range(0, 35, length=70)
 
@@ -165,12 +170,22 @@ let
 
 			CairoMakie.lines!(ax[k], xs, f.(xs), linewidth=8, 
 				color=RGBA(0.3,0.3,0.3,0.3))
+
+			if k % 5 ≠ 1
+				hideydecorations!(ax[k], grid=false, ticks=false)
+			end
+			if k < 26
+				hidexdecorations!(ax[k], grid=false, ticks=false)
+			end
 		end
 	end
 	rowgap!(fig.layout, 2)
 	colgap!(fig.layout, 2)
 	fig
 end	
+
+# ╔═╡ 80f62291-8339-4a3b-8ed9-a828231114af
+@subset(d, :KID .== 4)
 
 # ╔═╡ bac59d95-50b3-4e03-9ee1-9951d0becc43
 μ = generated_quantities(model_hierarchies1, chain_hierarchies1)
@@ -273,11 +288,9 @@ StatsPlots.plot(chain_hierarchies2[:,[:a0, :b0, :σag, :σbg, Symbol("ag[1]"), S
 
 # ╔═╡ cb658534-3593-4e6a-bfcd-1bfc8de43e11
 let
-	cycle = Cycle([:marker, :color], covary=true)
-	update_theme!(Scatter=(;cycle=cycle,), Lines=(;cycle=cycle))
-	
 	fig = Figure(resolution=(1000, 1000))
-	ax = [Axis(fig[i, j]) for i ∈ 1:5, j ∈ 1:6]
+	ax = [Axis(fig[j, i], limits=(0,35,0,1600),
+		title="KID: $(i + (j - 1) *  5)") for i ∈ 1:5, j ∈ 1:6]
 
 	xs = range(0, 35, length=70)
 
@@ -301,6 +314,13 @@ let
 
 			CairoMakie.lines!(ax[k], xs, f.(xs), linewidth=8, 
 				color=RGBA(0.3,0.3,0.3,0.3))
+
+			if k % 5 ≠ 1
+				hideydecorations!(ax[k], grid=false, ticks=false)
+			end
+			if k < 26
+				hidexdecorations!(ax[k], grid=false, ticks=false)
+			end
 		end
 	end
 	rowgap!(fig.layout, 2)
@@ -2168,6 +2188,7 @@ version = "0.9.1+5"
 # ╠═83dd23b3-4d0c-4051-96a9-07cd9826436d
 # ╠═9b367864-6373-44ad-b63a-19d73b2fad3b
 # ╠═87917e20-40e8-4cda-acc1-d176a63ffe98
+# ╠═80f62291-8339-4a3b-8ed9-a828231114af
 # ╠═bac59d95-50b3-4e03-9ee1-9951d0becc43
 # ╠═c2e90f57-3e7b-41ba-ab82-865feecdf707
 # ╠═32353023-9dc6-4268-a7d6-8fb0078dd9d6
