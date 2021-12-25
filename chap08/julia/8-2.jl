@@ -177,7 +177,31 @@ end
 
 
 # ╔═╡ c2e90f57-3e7b-41ba-ab82-865feecdf707
-median(chain_hierarchies1[:,:σy,:])
+let
+	collected_chain = reduce(hcat, mean(μ, dims=2))'
+	quantiles = reduce(hcat,
+		[quantile(collected_chain[:,i], [0.05, 0.5, 0.95]) for i ∈ 1:300])
+	
+	q20 = quantiles[1,:]
+	q50 = quantiles[2,:]
+	q80 = quantiles[3,:]
+	
+	low_error = q50 .- q20
+	high_error = q80 .- q50
+
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="observed", ylabel="predicted")
+
+	for g ∈ 1:3
+		fl = d.GID .== g
+		CairoMakie.scatter!(ax, Y[fl], q50[fl], markersize=15, label="$(g)")
+	end
+	CairoMakie.errorbars!(ax, Y, q50, low_error, high_error)
+	CairoMakie.lines!(ax, [200, 1600], [200, 1600], linestyle=:dot)
+
+	axislegend("GID", position=:rb)
+	fig
+end
 
 # ╔═╡ 32353023-9dc6-4268-a7d6-8fb0078dd9d6
 let
@@ -186,7 +210,7 @@ let
 	fig = Figure()
 	ax1 = Axis(fig[1,1], xlabel="value", ylabel="count")
 	ax2 = Axis(fig[1,1], yaxisposition=:right)
-
+	linkxaxes!(ax1, ax2)
 	CairoMakie.hist!(ax1, ϵ)
 
 	σy = median(chain_hierarchies1[:,:σy,:])
@@ -195,6 +219,11 @@ let
 
 	fig
 end
+
+# ╔═╡ 513cb2ee-1bba-4e45-bfc0-ccd8a10c5245
+md"""
+### 8.2.6 モデル式の記述 -その2
+"""
 
 # ╔═╡ 37f30c1f-c32f-4fb8-b189-9538b4f733ca
 @model function hierarchies2(X, Y, K2G)
@@ -218,10 +247,14 @@ end
 		ak[k] ~ Normal(ag[K2G[k,:GID]], σa[K2G[k,:GID]])
 		bk[k] ~ Normal(bg[K2G[k,:GID]], σb[K2G[k,:GID]])
 	end
-	
+
+	μ = Vector(undef, size(X, 1))
 	for n ∈ 1:size(X,1)
-		Y[n] ~ Normal(ak[X[n,:KID]] + bk[X[n,:KID]] * X[n,:X], σy[X[n,:GID]])
+		μ[n] = ak[X[n,:KID]] + bk[X[n,:KID]] * X[n,:X]
+		Y[n] ~ Normal(μ[n], σy[X[n,:GID]])
 	end
+
+	return μ
 end
 
 # ╔═╡ 4bed9095-a14d-428c-937a-1adc5f73b3a2
@@ -239,7 +272,97 @@ describe(chain_hierarchies2)
 StatsPlots.plot(chain_hierarchies2[:,[:a0, :b0, :σag, :σbg, Symbol("ag[1]"), Symbol("ag[2]"), Symbol("ag[3]"), Symbol("bg[1]"), Symbol("bg[2]"), Symbol("bg[3]"), Symbol("σa[1]"), Symbol("σa[2]"), Symbol("σa[3]"), Symbol("σb[1]"), Symbol("σb[2]"), Symbol("σb[3]"), Symbol("σy[1]"), Symbol("σy[2]"), Symbol("σy[3]")],:])
 
 # ╔═╡ cb658534-3593-4e6a-bfcd-1bfc8de43e11
+let
+	cycle = Cycle([:marker, :color], covary=true)
+	update_theme!(Scatter=(;cycle=cycle,), Lines=(;cycle=cycle))
+	
+	fig = Figure(resolution=(1000, 1000))
+	ax = [Axis(fig[i, j]) for i ∈ 1:5, j ∈ 1:6]
 
+	xs = range(0, 35, length=70)
+
+	glm_all = glm(@formula(Y ~ X), d, Normal(), IdentityLink())
+	aa = coef(glm_all)[1]
+	ba = coef(glm_all)[2]
+	f(x) = aa + ba * x
+
+	K2G = unique(d[:,[:KID,:GID]])
+	for g ∈ unique(K2G.GID)
+		_KinG = @subset(K2G, :GID .== g)
+		for k ∈ _KinG.KID
+			_tmpdf = @subset(d, :KID .== k)
+			CairoMakie.scatter!(ax[k], _tmpdf.X, _tmpdf.Y, label="$(k)", 
+				markersize=15)
+			
+			a = median(chain_hierarchies2[:,Symbol("ak[$(k)]"),:])
+			b = median(chain_hierarchies2[:,Symbol("bk[$(k)]"),:])
+			fk(x) = a + b * x
+			CairoMakie.lines!(ax[k], xs, fk.(xs), color=RGBA(1,0,0,0.5), linewidth=5)
+
+			CairoMakie.lines!(ax[k], xs, f.(xs), linewidth=8, 
+				color=RGBA(0.3,0.3,0.3,0.3))
+		end
+	end
+	rowgap!(fig.layout, 2)
+	colgap!(fig.layout, 2)
+	fig
+end
+
+# ╔═╡ c93b6f4b-5059-4cfa-8ea2-fad424bf3b23
+μ2 = generated_quantities(model_hierarchies2, chain_hierarchies2)
+
+# ╔═╡ d41751a2-28c9-4859-91e4-5bf8f92da974
+let
+	collected_chain = reduce(hcat, mean(μ2, dims=2))'
+	quantiles = reduce(hcat,
+		[quantile(collected_chain[:,i], [0.05, 0.5, 0.95]) for i ∈ 1:300])
+	
+	q20 = quantiles[1,:]
+	q50 = quantiles[2,:]
+	q80 = quantiles[3,:]
+	
+	low_error = q50 .- q20
+	high_error = q80 .- q50
+
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="observed", ylabel="predicted")
+
+	for g ∈ 1:3
+		fl = d.GID .== g
+		CairoMakie.scatter!(ax, Y[fl], q50[fl], markersize=15, label="$(g)")
+	end
+	CairoMakie.errorbars!(ax, Y, q50, low_error, high_error)
+	CairoMakie.lines!(ax, [200, 1600], [200, 1600], linestyle=:dot)
+
+	axislegend("GID", position=:rb)
+	fig
+end
+
+# ╔═╡ d4d72362-3814-4d97-a081-9ded4248f6bf
+let
+	μ = generated_quantities(model_hierarchies2, chain_hierarchies2)
+	ϵ =  mean(μ) .- Y
+	K2G = d[:,[:KID, :GID]]
+	_df = hcat(K2G, ϵ)
+	
+	fig = Figure()
+
+	ax1 = [Axis(fig[i,1], xlabel="value", ylabel="count") for i ∈ 1:3]
+	ax2 = [Axis(fig[i,1], yaxisposition=:right) for i ∈ 1:3]
+
+	for g ∈ 1:3
+		linkxaxes!(ax1[g], ax2[g])
+
+		_tmpdf = @subset(_df, :GID .== g)
+		CairoMakie.hist!(ax1[g], _tmpdf.x1)
+
+		σyg = median(chain_hierarchies2[:,Symbol("σy[$(g)]"),:])
+		xs = range(-200, 200, length=100)
+		CairoMakie.lines!(ax2[g], xs, pdf.(Normal(0, σyg), xs))
+	end
+	
+	fig
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2048,11 +2171,15 @@ version = "0.9.1+5"
 # ╠═bac59d95-50b3-4e03-9ee1-9951d0becc43
 # ╠═c2e90f57-3e7b-41ba-ab82-865feecdf707
 # ╠═32353023-9dc6-4268-a7d6-8fb0078dd9d6
+# ╠═513cb2ee-1bba-4e45-bfc0-ccd8a10c5245
 # ╠═37f30c1f-c32f-4fb8-b189-9538b4f733ca
 # ╠═4bed9095-a14d-428c-937a-1adc5f73b3a2
 # ╠═331065bc-5de7-47ba-974e-b2141b4e7c72
 # ╠═9869e19e-102f-48b0-8844-9d96f03aa756
 # ╠═51a41307-e91c-4fae-9fcd-13f3ad696abf
 # ╠═cb658534-3593-4e6a-bfcd-1bfc8de43e11
+# ╠═c93b6f4b-5059-4cfa-8ea2-fad424bf3b23
+# ╠═d41751a2-28c9-4859-91e4-5bf8f92da974
+# ╠═d4d72362-3814-4d97-a081-9ded4248f6bf
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
