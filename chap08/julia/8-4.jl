@@ -46,12 +46,15 @@ begin
 			1
 		end
 	end
-	_d2 = @transform(d2, :Weather = conv_weather(:Weather))
+	_d2 = @transform(d2, :Weather = conv_weather.(:Weather))
 	X2 = _d2[:,Not(:Y)]
 	
 	X1 = @transform(d1, :Score = :Score / 200)
 	Y = d2[:,:Y]
 end
+
+# ╔═╡ 64df099f-82bb-4530-9494-debb23542119
+X2
 
 # ╔═╡ 5c072a6d-ad78-45f6-8592-61fa8a77c418
 md"""
@@ -59,7 +62,7 @@ md"""
 """
 
 # ╔═╡ b34f979e-4bd3-453e-8462-868e16a04c40
-CairoMakie.boxplot(d1.A, d1.Score)
+CairoMakie.boxplot(d1.A, d1.Score, xlabel="A", ylabel="Score")
 
 # ╔═╡ 7beb17d3-6173-47e2-9406-62f0a7c50db8
 begin
@@ -95,7 +98,7 @@ sig(x) = 1 / (1 + exp(-x))
 	num_courses = length(unique(X2.CourseID))
 	b_course ~ filldist(Normal(0, σcs), num_courses)
 	x_course = b_course
-
+	
 	# modeling persons
 	b2 ~ Normal(0, 10)
 	b3 ~ Normal(0, 10)
@@ -103,30 +106,34 @@ sig(x) = 1 / (1 + exp(-x))
 	num_students = size(X1, 1)
 	b_student ~ filldist(Normal(0, σp), num_students)
 	x_student = @. b2 * X1[:,:A] + b3 * X1[:,:Score] + b_student
+
 	
 	# modeling classes
 	num_classes = length(Y)
 	#b_weatherB ~ Normal(0, 100)
 	#b_weatherC ~ Normal(0, 100)
 	#x_class = @. b_weatherB * X2[:,:Weather_B] + b_weatherC * X2[:,:Weather_C]
+	
 	b_weather ~ Normal(0, 10)
 	x_class = @. b_weather * X2[:,:Weather]
-	
+
 	# modeling 
 	b1 ~ Normal(0, 10)
 	x = @. b1 + x_student[X2[:,:PersonID]] + x_course[X2[:,:CourseID]] + x_class
 	q = sig.(x)
-
 	for i ∈ num_classes
 		Y[i] ~ Bernoulli(q[i])
 	end
 end
 
+# ╔═╡ c73b232f-f559-4b00-8ebc-a081e3d33a08
+
+
 # ╔═╡ 97a68124-1c2d-431b-b38e-1dc937585f1a
 model = logistic_hie(X1, X2, Y)
 
 # ╔═╡ bebe26e6-8229-401a-a7db-ec36ec930691
-chain = sample(model, NUTS(0.9), MCMCThreads(), 1_000, 4)
+chain = sample(model, NUTS(0.65), MCMCThreads(), 1_500, 4)
 
 # ╔═╡ 83c5ab8d-79bb-4ea2-8330-4f1c1b133775
 describe(chain)
@@ -136,6 +143,125 @@ StatsPlots.plot(chain[:,[:b1, :b2, :b3, :b_weather, :σp, :σcs],:])
 
 # ╔═╡ eae3a78d-5d99-4938-a994-4c2f05e1fb00
 
+
+# ╔═╡ 772193aa-0dc3-465e-973c-272e492db4f6
+
+
+# ╔═╡ 02a7a453-42d7-44e3-ac47-02f9feba7e63
+@model function logistic_hie2(X1, X2, Y)
+
+	# modeling courses
+	σcs ~ truncated(Normal(0, 10), 0, Inf)
+	num_courses = length(unique(X2.CourseID))
+
+	b_course = Vector(undef, num_courses)
+	x_course = Vector(undef, num_courses)
+	for c ∈ 1:num_courses
+		b_course[c] ~ Normal(0, σcs)
+		x_course[c] = b_course[c]
+	end
+	
+	# modeling persons
+	b2 ~ Normal(0, 10)
+	b3 ~ Normal(0, 10)
+	σp ~ truncated(Normal(0, 10), 0, Inf)
+	num_students = size(X1, 1)
+
+	b_student = Vector(undef, num_students)
+	x_student = Vector(undef, num_students)
+	for s ∈ 1:num_students
+		b_student[s] ~ Normal(0, σp)
+		x_student[s] = b2 * X1[s,:A] + b3 * X1[s,:Score] + b_student[s]
+	end
+	
+	# modeling classes
+	num_classes = length(Y)
+	x_class = Vector(undef, num_classes)	
+	b_weather ~ Normal(0, 10)
+
+	# modeling 
+	b1 ~ Normal(0, 10)
+	x = Vector(undef, num_classes)
+	q = Vector(undef, num_classes)
+	
+	for i ∈ 1:num_classes
+		x_class[i] = b_weather * X2[i,:Weather]
+		x[i] = b1 + x_student[X2[i,:PersonID]] + x_course[X2[i,:CourseID]] + x_class[i]
+		q[i] = sig(x[i])
+		Y[i] ~ Bernoulli(q[i])
+	end
+end
+
+# ╔═╡ b30babb8-585e-412c-a7e4-ba3e7b8a9996
+model2 = logistic_hie2(X1, X2, Y)
+
+# ╔═╡ 164d2832-9964-427e-be6a-61d1681159f1
+chain2 = sample(model2, NUTS(0.65), 500)
+# took 7600 seconds
+
+# ╔═╡ 4cc3f6e3-3ae2-4378-ac56-e9f4bb9ffdf5
+describe(chain2)
+
+# ╔═╡ cb171466-11c1-4131-806a-3f6232c92ac6
+StatsPlots.plot(chain2[:,[:b1, :b2, :b3, :b_weather, :σp, :σcs],:])
+
+# ╔═╡ 6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3
+@model function logistic_hie3(X1, X2, Y)
+
+	# modeling courses
+	σcs ~ truncated(Normal(0, 10), 0, Inf)
+	num_courses = length(unique(X2.CourseID))
+	b_course ~ filldist(Normal(0, σcs), num_courses)
+	x_course = Vector(undef, num_courses)
+	@. x_course = b_course
+	
+	# modeling persons
+	b2 ~ Normal(0, 10)
+	b3 ~ Normal(0, 10)
+	σp ~ truncated(Normal(0, 10), 0, Inf)
+	num_students = size(X1, 1)
+	b_student ~ filldist(Normal(0, σp), num_students)
+	x_student = Vector(undef, num_students)
+	@. x_student = b2 * X1[:,:A] + b3 * X1[:,:Score] + b_student
+
+	# modeling classes
+	num_classes = length(Y)
+	b_weather ~ Normal(0, 10)
+	x_class = Vector(undef, num_classes)
+	@. x_class = b_weather * X2[:,:Weather]
+	
+	# modeling 
+	b1 ~ Normal(0, 10)
+	x = Vector(undef, num_classes)
+	q = Vector(undef, num_classes)
+	@. x = b1 + x_student[X2[:,:PersonID]] + x_course[X2[:,:CourseID]] + x_class
+	@. q = sig(x)
+	@. Y ~ Bernoulli(q)
+end
+
+# ╔═╡ 84d12793-08fa-4f89-b39c-bd80a657575a
+model3 = logistic_hie3(X1, X2, Y)
+
+# ╔═╡ f9f1a400-0fa7-4b13-ade7-fe15511e6b67
+chain3 = sample(model3, NUTS(0.65), MCMCThreads(), 1_500, 4)
+
+# ╔═╡ 32e857f2-762b-4aee-8302-3060e56129a7
+describe(chain3)
+
+# ╔═╡ 4637fb89-f25a-43e1-837d-7796d920b3fb
+StatsPlots.plot(chain3[:,[:σcs, :σp, :b1, :b2, :b3, :b_weather],:])
+
+# ╔═╡ ff783515-92a4-4a9c-94b3-05acc478c1e5
+begin
+	keys = [:σcs, :σp, :b1, :b2, :b3, :b_weather]
+	posteriors = DataFrame(reduce(hcat, [chain3[:,key,1] for key in keys]), keys)
+end
+
+# ╔═╡ 1327f4e3-b997-4512-9b6b-910046dd4e92
+@df posteriors StatsPlots.violin([:b1, :b2, :b3, :b_weather, :σcs, :σp])
+
+# ╔═╡ acb0247c-aa30-4186-ada5-7052c7db1126
+get_params(chain3)[1]
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1946,6 +2072,7 @@ version = "0.9.1+5"
 # ╠═a16850b7-9cd9-415c-92a6-37d665487e77
 # ╠═ecf68e22-8fa1-4cb1-8337-ea67877223b8
 # ╠═b28311bf-8e2e-41b5-bf34-654c9edcba07
+# ╠═64df099f-82bb-4530-9494-debb23542119
 # ╠═5c072a6d-ad78-45f6-8592-61fa8a77c418
 # ╠═b34f979e-4bd3-453e-8462-868e16a04c40
 # ╠═86086637-d5b0-4bcc-8fb2-7a61eeb2e445
@@ -1954,11 +2081,26 @@ version = "0.9.1+5"
 # ╠═253d31ce-d426-4524-9f31-36948f10b8a9
 # ╠═844eb822-2735-4228-8941-ff9bfa5f8921
 # ╠═ae188e26-5508-487f-9ac0-820fbcb5fe3a
+# ╠═c73b232f-f559-4b00-8ebc-a081e3d33a08
 # ╠═97a68124-1c2d-431b-b38e-1dc937585f1a
 # ╠═bebe26e6-8229-401a-a7db-ec36ec930691
 # ╠═83c5ab8d-79bb-4ea2-8330-4f1c1b133775
 # ╠═c09ed940-1428-47ed-9f99-5da68976e17a
 # ╠═e4b9ad35-3a80-461e-a8b2-1810649ca88b
 # ╠═eae3a78d-5d99-4938-a994-4c2f05e1fb00
+# ╠═772193aa-0dc3-465e-973c-272e492db4f6
+# ╠═02a7a453-42d7-44e3-ac47-02f9feba7e63
+# ╠═b30babb8-585e-412c-a7e4-ba3e7b8a9996
+# ╠═164d2832-9964-427e-be6a-61d1681159f1
+# ╠═4cc3f6e3-3ae2-4378-ac56-e9f4bb9ffdf5
+# ╠═cb171466-11c1-4131-806a-3f6232c92ac6
+# ╠═6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3
+# ╠═84d12793-08fa-4f89-b39c-bd80a657575a
+# ╠═f9f1a400-0fa7-4b13-ade7-fe15511e6b67
+# ╠═32e857f2-762b-4aee-8302-3060e56129a7
+# ╠═4637fb89-f25a-43e1-837d-7796d920b3fb
+# ╠═ff783515-92a4-4a9c-94b3-05acc478c1e5
+# ╠═1327f4e3-b997-4512-9b6b-910046dd4e92
+# ╠═acb0247c-aa30-4186-ada5-7052c7db1126
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
