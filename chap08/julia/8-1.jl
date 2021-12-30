@@ -212,7 +212,7 @@ StatsPlots.plot(each_chain)
 # ╔═╡ 583451a5-7750-4c5a-ab32-e76764de7ce2
 let
 	fig = Figure()
-	axs = [Axis(fig[i, j], xlabel="X", ylabel="Y") for i in 1:2, j in 1:2]
+	axs = [Axis(fig[i, j], xlabel="X", ylabel="Y", title="KID: $(j + (i-1)*2)") for i in 1:2, j in 1:2]
 
 	xs = range(0, 30, length=60)
 
