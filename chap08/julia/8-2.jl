@@ -232,6 +232,22 @@ let
 	fig
 end
 
+# ╔═╡ d494f1b5-5186-4273-b465-07bb3e8c6c47
+md"""
+#### 練習問題(3)
+"""
+
+# ╔═╡ e1dbec78-b802-4940-8978-17590e417680
+let
+	keys = [Symbol("ag[1]"), Symbol("ag[2]"), Symbol("ag[3]"), 
+		Symbol("bg[1]"), Symbol("bg[2]"), Symbol("bg[3]")]
+	post = DataFrame(reduce(hcat, [chain_hierarchies1[:,key,2] for key ∈ keys]), keys) |> DataFrames.stack
+	StatsPlots.boxplot(post.variable, post.value)
+end
+
+# ╔═╡ 9bcef2ce-f057-47dc-a793-c704f6750663
+post
+
 # ╔═╡ 513cb2ee-1bba-4e45-bfc0-ccd8a10c5245
 md"""
 ### 8.2.6 モデル式の記述 -その2
@@ -2189,6 +2205,9 @@ version = "0.9.1+5"
 # ╠═bac59d95-50b3-4e03-9ee1-9951d0becc43
 # ╠═c2e90f57-3e7b-41ba-ab82-865feecdf707
 # ╠═32353023-9dc6-4268-a7d6-8fb0078dd9d6
+# ╠═d494f1b5-5186-4273-b465-07bb3e8c6c47
+# ╠═e1dbec78-b802-4940-8978-17590e417680
+# ╠═9bcef2ce-f057-47dc-a793-c704f6750663
 # ╠═513cb2ee-1bba-4e45-bfc0-ccd8a10c5245
 # ╠═37f30c1f-c32f-4fb8-b189-9538b4f733ca
 # ╠═4bed9095-a14d-428c-937a-1adc5f73b3a2

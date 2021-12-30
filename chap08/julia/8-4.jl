@@ -47,6 +47,7 @@ end
 # ╔═╡ 5c072a6d-ad78-45f6-8592-61fa8a77c418
 md"""
 ### データの分布の確認
+#### 練習問題(4)
 """
 
 # ╔═╡ b34f979e-4bd3-453e-8462-868e16a04c40
@@ -56,6 +57,30 @@ CairoMakie.boxplot(d1.A, d1.Score, xlabel="A", ylabel="Score")
 begin
 	gdf = groupby(d2, [:CourseID, :Weather])
 	d2_agg = combine(gdf, :Y => mean)
+end
+
+# ╔═╡ e4abb0f0-8b14-4c19-b937-3ab9ecb342e0
+let
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="出席率", ylabel="count")
+
+	gdf_student = groupby(d2, [:PersonID])
+	agg_df = combine(gdf_student, :Y => mean)
+	CairoMakie.hist!(ax, agg_df.Y_mean)
+
+	fig
+end
+
+# ╔═╡ 1058366c-2675-4892-9980-a3fca5d09a77
+let
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="出席率", ylabel="count")
+
+	gdf_course = groupby(d2, [:CourseID])
+	agg_df = combine(gdf_course, :Y => mean)
+	CairoMakie.hist!(ax, agg_df.Y_mean)
+
+	fig
 end
 
 # ╔═╡ 5d808c1d-e468-48a4-a6c9-7827ebd1fb1e
@@ -70,13 +95,87 @@ let
 	fig
 end
 
+# ╔═╡ fe356b7c-b2c3-4c00-b162-f64c1122c773
+md"""
+#### 練習問題(5)
+
+階層モデルを使わず、学生差$b_{student}[n]$と科目差$b_{course}[c]$が無情報事前分布に従う場合、モデルは
+
+$$\begin{eqnarray}
+	Y[i] &\sim & \mathrm{Bern}(q[i]) \\
+	q[i] &= & \mathrm{sig}\left(b_1 + x_{student}[X_2[i,PersonID]] + x_{course}[X_2[i,CourseID]] + x_{class}[i] \right)\\
+	b_1 &\sim & \mathcal{N}(0, 100) \\
+	x_{student}[n] &=& b_2 * X_1[n,A] + b_3 * X_1[n,Score] + b_{student}[n] \\
+	b_2 &\sim & \mathcal{N}(0, 100) \\
+	b_3 &\sim & \mathcal{N}(0, 100) \\
+	b_{student}[n] &=& \mathcal{N}(0, 100) \\
+	x_{course}[c] &=& b_{course}[c] \\
+	b_{course}[c] &\sim & \mathcal{N}(0, 100) \\
+	x_{class}[i] & = & b_{weather} * X_2[i,Weather] \\
+	b_{weather} &\sim & \mathcal{N}(0, 100) \\
+\end{eqnarray}$$
+"""
+
 # ╔═╡ 253d31ce-d426-4524-9f31-36948f10b8a9
 md"""
 ### 8.4.4' Turingで実装
+
+学生と科目に関する階層モデルの式は以下のようになる。
+
+$$\begin{eqnarray}
+	Y[i] &\sim & \mathrm{Bern}(q[i]) \\
+	q[i] &= & \mathrm{sig}\left(b_1 + x_{student}[X_2[i,PersonID]] + x_{course}[X_2[i,CourseID]] + x_{class}[i] \right)\\
+	b_1 &\sim & \mathcal{N}(0, 100) \\
+	x_{student}[n] &=& b_2 * X_1[n,A] + b_3 * X_1[n,Score] + b_{student}[n] \\
+	b_2 &\sim & \mathcal{N}(0, 100) \\
+	b_3 &\sim & \mathcal{N}(0, 100) \\
+	b_{student}[n] &=& \mathcal{N}(0, \sigma_p) \\
+	\sigma_p &\sim & \mathcal{N}^+(0, 100) \\
+	x_{course}[c] &=& b_{course}[c] \\
+	b_{course}[c] &\sim & \mathcal{N}(0, \sigma_c) \\
+	\sigma_c &\sim & \mathcal{N}^+(0, 100) \\
+	x_{class}[i] & = & b_{weather} * X_2[i,Weather] \\
+	b_{weather} &\sim & \mathcal{N}(0, 100) \\
+\end{eqnarray}$$
 """
 
 # ╔═╡ 844eb822-2735-4228-8941-ff9bfa5f8921
 sig(x) = 1 / (1 + exp(-x))
+
+# ╔═╡ 9d96137a-59db-49b6-9233-42092f8b2a0d
+@model function logistic(X1, X2, Y)
+
+	num_courses = length(unique(X2.CourseID))
+	b_course ~ filldist(Normal(0, 100), num_courses)
+	x_course = Vector(undef, num_courses)
+	@. x_course = b_course
+	
+	num_students = size(X1, 1)
+	b2 ~ Normal(0, 100)
+	b3 ~ Normal(0, 100)
+	b_student ~ filldist(Normal(0, 100), num_students)
+	x_student = Vector(undef, num_students)
+	@. x_student = b2 * X1[:,:A] + b3 * X1[:,:Score] + b_student
+	
+	num_classes = length(Y)
+	b_weather ~ Normal(0, 100)
+	x_class = Vector(undef, num_classes)
+	@. x_class = b_weather * X2[:,:Weather]
+	
+	b1 ~ Normal(0, 100)
+	q = Vector(undef, num_classes)
+	@. q = sig.(b1 + x_student[X2[:,:PersonID]] + x_course[X2[:,:CourseID]] + x_class)
+	for i ∈ 1:num_classes
+		Y[i] ~ Bernoulli(q[i])
+	end
+	return q
+end
+
+# ╔═╡ 39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
+model_logi = logistic(X1, X2, Y)
+
+# ╔═╡ 83771939-1b90-4bc6-b4e4-a6f28be9fbe8
+chain_logi = sample(model_logi, NUTS(0.65), 1_000)
 
 # ╔═╡ 6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3
 @model function logistic_ml(X1, X2, Y)
@@ -2031,7 +2130,13 @@ version = "0.9.1+5"
 # ╠═5c072a6d-ad78-45f6-8592-61fa8a77c418
 # ╠═b34f979e-4bd3-453e-8462-868e16a04c40
 # ╠═7beb17d3-6173-47e2-9406-62f0a7c50db8
+# ╠═e4abb0f0-8b14-4c19-b937-3ab9ecb342e0
+# ╠═1058366c-2675-4892-9980-a3fca5d09a77
 # ╠═5d808c1d-e468-48a4-a6c9-7827ebd1fb1e
+# ╠═fe356b7c-b2c3-4c00-b162-f64c1122c773
+# ╠═9d96137a-59db-49b6-9233-42092f8b2a0d
+# ╠═39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
+# ╠═83771939-1b90-4bc6-b4e4-a6f28be9fbe8
 # ╠═253d31ce-d426-4524-9f31-36948f10b8a9
 # ╠═844eb822-2735-4228-8941-ff9bfa5f8921
 # ╠═6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3

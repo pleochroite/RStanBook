@@ -133,6 +133,11 @@ md"""
  ↑図を見るとあまりうまくいってないように見える。要確認。
 """
 
+# ╔═╡ a2999f93-6571-42d8-8ce4-359aa993ac66
+md"""
+#### 練習問題(1)
+"""
+
 # ╔═╡ 185b13ec-552a-483c-9efc-daeb73d0d33d
 md"""
 ### 8.1.4 階層モデル
@@ -239,6 +244,48 @@ let
 	fig
 end
 
+# ╔═╡ 82b02b39-1948-48e5-8b20-551579e634d8
+let
+	fig = Figure()
+	axs = [Axis(fig[i, j], xlabel="X", ylabel="Y",
+		title="KID: $(j + (i-1)*2)") for i in 1:2, j in 1:2]
+
+	xs = range(0, 30, length=60)
+
+	a_all = coef(glm_all)[1]
+	b_all = coef(glm_all)[2]
+	g(x) = a_all + b_all * x
+	
+	for i in 1:2
+		for j in 1:2
+			k = j + (i - 1) * 2
+			_d = @subset(d, :KID .== k)
+			CairoMakie.scatter!(axs[i,j], _d.X, _d.Y)
+
+			a = quantile(each_chain[:, Symbol("a[$(k)]"), 1], 0.5)
+			b = quantile(each_chain[:, Symbol("b[$(k)]"), 1], 0.5)
+			f(x) = a + b * x
+
+			a10 = quantile(each_chain[:, Symbol("a[$(k)]"), 1], 0.1)
+			b10 = quantile(each_chain[:, Symbol("b[$(k)]"), 1], 0.1)
+			f10(x) = a10 + b10 * x
+
+			a90 = quantile(each_chain[:, Symbol("a[$(k)]"), 1], 0.9)
+			b90 = quantile(each_chain[:, Symbol("b[$(k)]"), 1], 0.9)
+			f90(x) = a90 + b90 * x		
+
+			
+			CairoMakie.lines!(axs[i,j], xs, f.(xs), color=RGBA(0,1,1,1))
+			CairoMakie.band!(axs[i,j], xs, f10.(xs), f90.(xs),
+				color=RGBA(0.3,0.3,0.3,0.3))
+			
+			CairoMakie.lines!(axs[i,j], xs, g.(xs),
+				color=RGBA(0.5, 0.5, 0, 0.4), linewidth=10)
+		end
+	end
+	fig
+end
+
 # ╔═╡ 5b93dd9a-8e29-4a08-8c3a-b86b4b39875c
 let
 	# Visualize
@@ -305,12 +352,14 @@ StatsPlots.plot(hie_chain)
 # ╔═╡ a361a3d0-f953-458e-b64d-bed68166b0d4
 md"""
 ### 8.1.5 モデルの比較
+
+#### 練習問題(2)
 """
 
 # ╔═╡ b3e13901-c747-4199-a11d-5abd07f6bba8
 let
 	fig = Figure()
-	axs = [Axis(fig[i, j], xlabel="X", ylabel="Y", title="$(j+(i-1)*2)")
+	axs = [Axis(fig[i, j], xlabel="X", ylabel="Y", title="KID: $(j+(i-1)*2)")
 		for i in 1:2, j in 1:2]
 	linkyaxes!(axs[1,1], axs[1,2])
 	linkyaxes!(axs[2,1], axs[2,2])
@@ -331,21 +380,36 @@ let
 			b2 = quantile(each_chain[:, Symbol("b[$(k)]"), 1], 0.5)
 			f2(x) = a2 + b2 * x
 			CairoMakie.lines!(axs[i,j], xs, f2.(xs), color=RGBA(0,1,0,0.5),
-				linestyle=:dot, linewidth=5)
+				linestyle=:dot, linewidth=3)
 
 			
 			a3 = quantile(hie_chain[:,Symbol("a[$(k)]"),1], 0.5)
 			b3 = quantile(hie_chain[:,Symbol("b[$(k)]"),1], 0.5)
 			f3(x) = a3 + b3 * x
+
 			CairoMakie.lines!(axs[i,j], xs, f3.(xs), 
 				color=RGBA(1,0,1,0.5), linewidth = 5)
 			
+			a3_10 = quantile(hie_chain[:,Symbol("a[$(k)]"),1], 0.1)
+			b3_10 = quantile(hie_chain[:,Symbol("b[$(k)]"),1], 0.1)
+			a3_90 = quantile(hie_chain[:,Symbol("a[$(k)]"),1], 0.9)
+			b3_90 = quantile(hie_chain[:,Symbol("b[$(k)]"),1], 0.9)
+
+			f3_low(x) = a3_10 + b3_10 * x
+			f3_high(x) = a3_90 + b3_90 * x
+			
+			CairoMakie.band!(axs[i,j], xs, f3_low.(xs), f3_high.(xs), color=RGBA(0.3,0.3,0.3,0.3))
+
+			
 			CairoMakie.lines!(axs[i,j], xs, g.(xs),
-				color=RGBA(0.5, 0.5, 0.5, 0.5), linewidth=20)
+				color=RGBA(0, 0, 0.5, 0.5), linewidth=2)
 		end
 	end
 	fig
 end
+
+# ╔═╡ 79f89a11-5b40-4b6b-8622-9225395507c1
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2163,6 +2227,8 @@ version = "0.9.1+5"
 # ╠═c14b1c87-0119-4f95-bf6d-7a7faaaa8eb1
 # ╠═8430e904-f4f7-4c5e-8fd2-566b0f651be2
 # ╠═583451a5-7750-4c5a-ab32-e76764de7ce2
+# ╠═a2999f93-6571-42d8-8ce4-359aa993ac66
+# ╠═82b02b39-1948-48e5-8b20-551579e634d8
 # ╠═185b13ec-552a-483c-9efc-daeb73d0d33d
 # ╠═f1ad6187-8a38-4ba0-ae48-27397b7ee1b2
 # ╠═5b93dd9a-8e29-4a08-8c3a-b86b4b39875c
@@ -2174,5 +2240,6 @@ version = "0.9.1+5"
 # ╠═85d4976c-4665-40bf-a521-2aeeed592e75
 # ╟─a361a3d0-f953-458e-b64d-bed68166b0d4
 # ╠═b3e13901-c747-4199-a11d-5abd07f6bba8
+# ╠═79f89a11-5b40-4b6b-8622-9225395507c1
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
