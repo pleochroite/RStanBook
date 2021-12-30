@@ -62,7 +62,7 @@ function encode_weather(weather)
 end
 
 # ╔═╡ b9339426-e5ce-4892-9c8a-6d2cd66fad71
-d = @transform(d_raw, :Weather = encode_weather.(:Weather))
+d = @transform(d_raw, :Weather = encode_weather.(:Weather), :Score = :Score ./ 200)
 
 # ╔═╡ 0b093eb5-97f8-4b1e-b348-5d4c18fb29cb
 begin
@@ -86,17 +86,18 @@ sig(x) = 1 / (1 + exp(-x))
 	b4 ~ Normal(0, 1)
 
 	q = Vector(undef, size(X,1))
+	@. q = sig(b1 + b2 * X[:,:A] + b3 * X[:, :Score] + b4 * X[:, :Weather])
 	for n in size(X,1)
-		q[n] = sig(b1 + b2 * X[n,:A] + b3 * X[n, :Score] + b4 * X[n, :Weather])
 		Y[n] ~ Bernoulli(q[n])
 	end
+	return q
 end
 
 # ╔═╡ 2c8e0b16-d6f1-49c5-8faa-5e5470d20be1
 model = logistic_regression(X, Y)
 
 # ╔═╡ 45061434-d78c-4207-99cc-dda49b401c37
-chain = sample(model, NUTS(0.65), MCMCThreads(), 1_000, 3)
+chain = sample(model, NUTS(0.65), MCMCThreads(), 2_000, 4)
 
 # ╔═╡ 27c224a2-e922-46f7-aa51-9b3eba6f5636
 describe(chain)
@@ -109,10 +110,30 @@ md"""
 ### 5.3.7 図によるモデルのチェック
 """
 
-# ╔═╡ 8ebd15c4-e3fe-47b0-ab1f-933aa22dd2fa
-md"""
-Todo: Fig.5.9に相当するものを書く
-"""
+# ╔═╡ 48e0e0fe-153e-40a2-bbad-23ffa4ffadb9
+qs = hcat([quantile(chain[:,key,1], [0.1, 0.5, 0.9]) for key in [:b1, :b2, :b3, :b4]]...)
+
+# ╔═╡ 3e5c2d72-6611-4322-880a-dc3918c4b671
+let
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="Score", ylabel="q")
+
+	xs = range(30/200, 1, length=100)
+	A = 0
+	W = 0
+	
+	low(x) = ([1 A x/200 W] * qs[1,:])[1] |> sig
+	mid(x) = ([1 A x/200 W] * qs[2,:])[1] |> sig
+	high(x) = ([1 A x/200 W] * qs[3,:])[1] |> sig
+
+	CairoMakie.lines!(ax, xs, mid.(xs))
+	CairoMakie.band!(ax, xs, low.(xs), high.(xs))
+
+	_tmpdf = @subset(d, :A .== 0, :Weather .== 0)
+
+	CairoMakie.scatter!(ax, _tmpdf.Score, _tmpdf.Y)
+	fig
+end	
 
 # ╔═╡ c7d7171c-0a2f-4d5e-91ff-145782602a76
 md"""
@@ -120,6 +141,25 @@ md"""
 
 Todo: Fig.5.10に相当するものを書く
 """
+
+# ╔═╡ 62984d57-e8dd-469a-901e-5cea2f2cf230
+begin
+	q = reduce(hcat, generated_quantities(model, chain[:,:,1]))'
+	q50 = [median(q[:,i]) for i ∈ 1:size(q,2)]
+end
+
+# ╔═╡ c13486b9-8a43-4a4d-91e7-8a3f6de21234
+let
+	fig = Figure()
+	ax = Axis(fig[1,1])
+
+	_tmpdf = DataFrame(hcat(Y, q50), [:Y, :q50])
+	CairoMakie.violin!(ax, _tmpdf.Y, _tmpdf.q50; 
+		orientation=:horizontal, show_median=true, )
+
+	
+	fig
+end
 
 # ╔═╡ c279ceed-4eb5-4c44-b698-7389d8aa0266
 md"""
@@ -134,8 +174,8 @@ predictions = sig.(Matrix(hcat(ones(size(X,1)), X)) * medians)
 
 # ╔═╡ a57ee102-d687-4dd0-96b9-9cfb30974077
 let
-	fpr = reverse(false_positive_rate.(roc(Y, predictions)))
-	tpr = reverse(true_positive_rate.(roc(Y, predictions)))
+	fpr = reverse(false_positive_rate.(roc(Y, q50)))
+	tpr = reverse(true_positive_rate.(roc(Y, q50)))
 
 	fig = Figure()
 	ax = Axis(fig[1,1], xlabel="false positive rate", ylabel="true positive rate")
@@ -155,7 +195,8 @@ md"""
 
 # ╔═╡ 3ef76b45-2721-4fa4-a19b-6696d64d0e62
 d_c = @transform(copy(d_raw), :Weather_B = :Weather .== "B",
-			:Weather_C = :Weather .== "C")
+			:Weather_C = :Weather .== "C",
+			:Score = :Score ./ 200)
 
 # ╔═╡ 185e0de0-5a25-41d4-980c-95c7334ab257
 X_c = d_c[:,[:A, :Score, :Weather_B, :Weather_C]]
@@ -169,19 +210,19 @@ X_c = d_c[:,[:A, :Score, :Weather_B, :Weather_C]]
 	b4_C ~ Normal(0, 100)
 
 	q = Vector(undef, size(X,1))
-	for n in 1:size(X,1)
-		q[n] = sig(b1 + b2 * X[n,:A] + b3 * X[n, :Score] + 
-			b4_B * X[n, :Weather_B] + b4_C * X[n, :Weather_C])
+	@. q = sig(b1 + b2 * X[:,:A] + b3 * X[:, :Score] + 
+			b4_B * X[:, :Weather_B] + b4_C * X[:, :Weather_C])
+	for n in 1:size(X,1) 
 		Y[n] ~ Bernoulli(q[n])
 	end
+	return q
 end
 
 # ╔═╡ ca1da0ca-715a-4291-87fc-0fc5123a08a0
 model_c = logistic_regression2(X_c, Y)
 
 # ╔═╡ eb8dc184-e3c5-47d4-978a-6cfd50daba8d
-## this may take 10~ mins
-chain_c = sample(model_c, NUTS(0.65), MCMCThreads(), 1_000, 3)
+chain_c = sample(model_c, NUTS(0.65), MCMCThreads(), 2_000, 4)
 
 # ╔═╡ de50a45a-5084-481b-98f2-fd49f23135c1
 describe(chain_c)
@@ -190,7 +231,26 @@ describe(chain_c)
 StatsPlots.plot(chain_c)
 
 # ╔═╡ fdb5ccd0-1849-4319-ab09-8e41c7182325
+begin
+	qc = reduce(hcat, generated_quantities(model_c, chain_c[:,:,1]))'
+	qc50 = [median(q[:,i]) for i ∈ 1:size(q,2)]
+end
 
+# ╔═╡ c86813b3-540d-4ba9-8a3c-5d59b310cad6
+let
+	fpr = reverse(false_positive_rate.(roc(Y, qc50)))
+	tpr = reverse(true_positive_rate.(roc(Y, qc50)))
+
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel="false positive rate", ylabel="true positive rate")
+	CairoMakie.lines!(ax, fpr, tpr)
+	CairoMakie.lines!(ax, [0,1], [0,1]; color=:gray50)
+
+	auc = sum([(fpr[i+1] - fpr[i]) * (tpr[i+1] + tpr[i]) / 2 for i in 1:length(fpr)-1])
+	CairoMakie.text!("AUC: $(round(auc; digits=3))"; position=(0, 0.95))
+	
+	fig
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2005,8 +2065,11 @@ version = "0.9.1+5"
 # ╠═27c224a2-e922-46f7-aa51-9b3eba6f5636
 # ╠═597e9a13-6402-4911-b4e2-600041daecdc
 # ╠═8cb99fa1-f964-4b8f-9ab6-2239851dbe31
-# ╠═8ebd15c4-e3fe-47b0-ab1f-933aa22dd2fa
+# ╠═48e0e0fe-153e-40a2-bbad-23ffa4ffadb9
+# ╠═3e5c2d72-6611-4322-880a-dc3918c4b671
 # ╠═c7d7171c-0a2f-4d5e-91ff-145782602a76
+# ╠═62984d57-e8dd-469a-901e-5cea2f2cf230
+# ╠═c13486b9-8a43-4a4d-91e7-8a3f6de21234
 # ╠═c279ceed-4eb5-4c44-b698-7389d8aa0266
 # ╠═47d73be4-e7d2-462f-9f37-311e889a1a78
 # ╠═05bacb39-774d-4010-8436-43b41a70dba0
@@ -2020,5 +2083,6 @@ version = "0.9.1+5"
 # ╠═de50a45a-5084-481b-98f2-fd49f23135c1
 # ╠═bd4e6ab3-accd-402a-83e4-0a9d75da8fc8
 # ╠═fdb5ccd0-1849-4319-ab09-8e41c7182325
+# ╠═c86813b3-540d-4ba9-8a3c-5d59b310cad6
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
