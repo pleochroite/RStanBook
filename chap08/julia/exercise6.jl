@@ -44,7 +44,7 @@ end
 model = ml_binomial(Y)
 
 # ╔═╡ 5c5dff54-810e-434e-bc2c-5472538517e2
-chain = sample(model, NUTS(0.65), 2_000)
+chain = sample(model, NUTS(0.65), MCMCThreads(), 2_000, 4)
 
 # ╔═╡ 4cba0c50-67b2-4a51-8c8a-1febae1c675d
 describe(chain)

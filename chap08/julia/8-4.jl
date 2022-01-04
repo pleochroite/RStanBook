@@ -169,13 +169,8 @@ sig(x) = 1 / (1 + exp(-x))
 		Y[i] ~ Bernoulli(q[i])
 	end
 	return q
+	# 62000秒経っても収束しない
 end
-
-# ╔═╡ 39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
-model_logi = logistic(X1, X2, Y)
-
-# ╔═╡ 83771939-1b90-4bc6-b4e4-a6f28be9fbe8
-chain_logi = sample(model_logi, NUTS(0.65), 1_000)
 
 # ╔═╡ 6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3
 @model function logistic_ml(X1, X2, Y)
@@ -318,6 +313,19 @@ prior_chain = sample(model, Prior(), 1_000)
 
 # ╔═╡ de1464e4-756d-41bc-9b33-cadda54b1dda
 prior_check = predict(model_predict, prior_chain)
+
+# ╔═╡ 39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
+model_logi = logistic(X1, X2, Y)
+
+# ╔═╡ 83771939-1b90-4bc6-b4e4-a6f28be9fbe8
+chain_logi = sample(model_logi, NUTS(0.65), 1_000)
+# took ~110000secs
+
+# ╔═╡ a48c5d7a-2599-4b5d-9a1c-9145adea12c6
+describe(chain_logi)
+
+# ╔═╡ dd233f76-8024-4b44-9835-f50f8f20b620
+StatsPlots.plot(chain_logi)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2133,11 +2141,7 @@ version = "0.9.1+5"
 # ╠═e4abb0f0-8b14-4c19-b937-3ab9ecb342e0
 # ╠═1058366c-2675-4892-9980-a3fca5d09a77
 # ╠═5d808c1d-e468-48a4-a6c9-7827ebd1fb1e
-# ╠═fe356b7c-b2c3-4c00-b162-f64c1122c773
-# ╠═9d96137a-59db-49b6-9233-42092f8b2a0d
-# ╠═39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
-# ╠═83771939-1b90-4bc6-b4e4-a6f28be9fbe8
-# ╠═253d31ce-d426-4524-9f31-36948f10b8a9
+# ╟─253d31ce-d426-4524-9f31-36948f10b8a9
 # ╠═844eb822-2735-4228-8941-ff9bfa5f8921
 # ╠═6b5bc7f1-369b-44f8-8d2c-dec0ce410ea3
 # ╠═84d12793-08fa-4f89-b39c-bd80a657575a
@@ -2160,5 +2164,11 @@ version = "0.9.1+5"
 # ╠═7b8ddc0d-835c-4a93-a331-725746c1b4cb
 # ╠═25efc652-a869-486e-aebf-4db9ec5c3e7a
 # ╠═de1464e4-756d-41bc-9b33-cadda54b1dda
+# ╠═fe356b7c-b2c3-4c00-b162-f64c1122c773
+# ╠═9d96137a-59db-49b6-9233-42092f8b2a0d
+# ╠═39c3efd4-57b6-409d-b5c1-c2e8ce9dd335
+# ╠═83771939-1b90-4bc6-b4e4-a6f28be9fbe8
+# ╠═a48c5d7a-2599-4b5d-9a1c-9145adea12c6
+# ╠═dd233f76-8024-4b44-9835-f50f8f20b620
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
