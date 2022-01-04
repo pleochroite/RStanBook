@@ -7,6 +7,9 @@ using InteractiveUtils
 # ╔═╡ 01b31475-d4de-4b4b-8988-462e27c55251
 using Turing, Distributions, MCMCChains, CairoMakie, StatsPlots, CSV, DataFrames, DataFramesMeta
 
+# ╔═╡ 02cfcaf7-5e9a-4b51-af14-c1d6355e00cc
+using Bijectors
+
 # ╔═╡ 9811f07c-6086-11ec-19b2-6b7b7b2b0348
 md"""
 ## 7.2 対数をとるか否か
@@ -201,12 +204,45 @@ let
 	fig
 end
 
-# ╔═╡ 02cfcaf7-5e9a-4b51-af14-c1d6355e00cc
+# ╔═╡ b3b9d8b0-8694-4aac-b47e-640d4d0276ac
+md"""
+#### Bijectors.jlを使って変換できるか試してみる
+"""
 
+# ╔═╡ 265ef54a-3a7c-454f-ab42-bf32209642a6
+
+
+# ╔═╡ 1c3d6071-5b3d-4636-b5c4-82e480e9ccbe
+@model function linear_regression2(X,Y)
+	b1 ~ Normal(0, 100)
+	b2 ~ Normal(0, 100)
+	σ ~ truncated(Normal(0, 100), 0, Inf)
+
+	b = Bijectors.Exp()
+	
+	μ = Vector(undef, size(X,1))
+	@. μ = b1 + b2 * log(X)
+	for n in 1:size(X,1)
+		Y[n] ~ transformed(Normal(μ[n], σ), b)
+	end
+end
+
+# ╔═╡ 77107e58-191b-42d9-b155-5959a538a56b
+model_bij = linear_regression2(X, Y)
+
+# ╔═╡ 84538682-2da7-4427-bf60-f377c01f63b2
+chain_bij = sample(model_bij, NUTS(0.65), MCMCThreads(), 1_500, 4)
+
+# ╔═╡ a9e28f72-2c32-470b-85d8-c62228eebe0c
+describe(chain_bij)
+
+# ╔═╡ ce719725-fb87-4f1c-aa8e-a6dfd5ee4249
+StatsPlots.plot(chain_bij)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Bijectors = "76274a88-744f-5084-9051-94815aaf08c4"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -217,6 +253,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
+Bijectors = "~0.9.11"
 CSV = "~0.9.11"
 CairoMakie = "~0.6.6"
 DataFrames = "~1.3.1"
@@ -1997,6 +2034,13 @@ version = "0.9.1+5"
 # ╠═6ec02991-3849-455e-98fe-d2985e00288b
 # ╠═19dc708e-51ff-43ff-bc4a-2f1f36fafce5
 # ╠═720207c5-02d3-4dcd-9255-1a382ccd0d25
+# ╠═b3b9d8b0-8694-4aac-b47e-640d4d0276ac
+# ╠═265ef54a-3a7c-454f-ab42-bf32209642a6
 # ╠═02cfcaf7-5e9a-4b51-af14-c1d6355e00cc
+# ╠═1c3d6071-5b3d-4636-b5c4-82e480e9ccbe
+# ╠═77107e58-191b-42d9-b155-5959a538a56b
+# ╠═84538682-2da7-4427-bf60-f377c01f63b2
+# ╠═a9e28f72-2c32-470b-85d8-c62228eebe0c
+# ╠═ce719725-fb87-4f1c-aa8e-a6dfd5ee4249
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
