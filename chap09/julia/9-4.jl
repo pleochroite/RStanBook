@@ -45,7 +45,7 @@ rand(Categorical(rand(td)))
 # ╔═╡ 7f45918d-47e2-4c90-a64d-fc85bd2e1807
 # proposals are rejected due to numerical errors
 @model function simplex_model(Y)
-	dist = Dirichlet(6, 1)
+	dist = Dirichlet(6, 0.9)
 	b = bijector(dist)
 	binv = inv(b)
 	θ ~ transformed(dist, binv)
@@ -59,13 +59,27 @@ end
 model = simplex_model(d.Face)
 
 # ╔═╡ 13586055-662f-4303-855d-bb39cfd1c70f
-chain = sample(model, NUTS(1, 0.65))
+# HMC/NUTS generates proposals to be rejected
+# Gibbs(PG(200, :θ, :Y)) takes 660 seconds
+chain = sample(model, Gibbs(PG(200, :θ, :Y)), MCMCThreads(), 1500, 4)
 
 # ╔═╡ 7f4c3437-9bd5-4439-8628-e7379e4e03e5
 describe(chain)
 
 # ╔═╡ e0dc99c2-5f2f-436d-b567-4ece5a890733
 StatsPlots.plot(chain)
+
+# ╔═╡ 38073ed3-f53f-4ab9-8f2f-bd1f5c445e07
+# HMC/NUTS generates proposals to be rejected
+# Gibbs(PG(200, :θ, :Y)) takes 660 seconds
+# PG(50) takes 180 seconds
+chain2 = sample(model, PG(300), MCMCThreads(), 1500, 4)
+
+# ╔═╡ 1da18839-432a-4250-a06b-5d8b13f57628
+describe(chain2)
+
+# ╔═╡ 3659400e-1f64-4871-8087-3acb4a744d07
+StatsPlots.plot(chain2)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1863,5 +1877,8 @@ version = "0.9.1+5"
 # ╠═13586055-662f-4303-855d-bb39cfd1c70f
 # ╠═7f4c3437-9bd5-4439-8628-e7379e4e03e5
 # ╠═e0dc99c2-5f2f-436d-b567-4ece5a890733
+# ╠═38073ed3-f53f-4ab9-8f2f-bd1f5c445e07
+# ╠═1da18839-432a-4250-a06b-5d8b13f57628
+# ╠═3659400e-1f64-4871-8087-3acb4a744d07
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
