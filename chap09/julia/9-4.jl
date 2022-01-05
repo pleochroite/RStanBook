@@ -7,6 +7,9 @@ using InteractiveUtils
 # ╔═╡ 4376bd7e-6d29-11ec-07fa-21781495138c
 using Turing, MCMCChains, Distributions, StatsPlots, CairoMakie, LinearAlgebra, Colors, CSV, DataFrames, DataFramesMeta, Statistics, Bijectors
 
+# ╔═╡ 47d99c44-525d-4f7b-a5ea-a7f6ce8f2b29
+using FreqTables
+
 # ╔═╡ 69757264-5176-4e41-80f3-8d8722eda6da
 
 
@@ -23,6 +26,11 @@ d = CSV.read("../input/data-dice.txt", DataFrame)
 
 # ╔═╡ 1bb051f4-9905-4196-a45d-8c5c30fd4d09
 CairoMakie.hist(d.Face; bins=6)
+
+# ╔═╡ 9b784668-3b23-4754-a29b-11d015297005
+md"""
+#### Model using categorical distribution
+"""
 
 # ╔═╡ 3fccd56e-c85d-41ea-9b48-91b7e8645b87
 dist = Dirichlet(6,1)
@@ -43,7 +51,6 @@ rand(td)
 rand(Categorical(rand(td)))
 
 # ╔═╡ 7f45918d-47e2-4c90-a64d-fc85bd2e1807
-# proposals are rejected due to numerical errors
 @model function simplex_model(Y)
 	dist = Dirichlet(6, 0.9)
 	b = bijector(dist)
@@ -81,6 +88,43 @@ describe(chain2)
 # ╔═╡ 3659400e-1f64-4871-8087-3acb4a744d07
 StatsPlots.plot(chain2)
 
+# ╔═╡ b2d964fd-fba7-4315-8fdc-8cf5011cc9fb
+md"""
+#### Model using multinomial distribution
+"""
+
+# ╔═╡ 5856d405-460f-4bf7-8894-3d3e1b77a027
+yt = vec(freqtable(d.Face))
+
+# ╔═╡ d8a853a2-b4a4-4f9b-adf8-3c3e6ff7c158
+Dirichlet(6, 0.9) |> bijector |> inv
+
+# ╔═╡ e4bd31ee-a190-4125-9a78-269cabb8628c
+@model function mn_model(Y)
+	N = sum(Y)
+
+	dist = Dirichlet(6, 0.9)
+	binv = dist |> bijector |> inv
+	θ ~ transformed(dist, binv)
+	
+	Y ~ Multinomial(N, θ)
+end
+
+# ╔═╡ 27b1149b-c567-46ec-ac63-a194f936814a
+model_mn = mn_model(yt)
+
+# ╔═╡ 810daeb1-3903-4b36-8a56-342bf96b5a0c
+chain_mn = sample(model_mn, PG(500), MCMCThreads(), 1_500, 4)
+
+# ╔═╡ 18adfc64-5ab4-4116-a77f-33a4539c24aa
+describe(chain_mn)
+
+# ╔═╡ 29084eae-f9ff-4638-b742-edde1dd62c5a
+StatsPlots.plot(chain_mn)
+
+# ╔═╡ 9420ed21-23c6-49bb-aa4e-804abfcf9f3c
+
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -91,6 +135,7 @@ Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FreqTables = "da1fdf0e-e0ff-5433-a45f-9bb5ff651cb1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -105,6 +150,7 @@ Colors = "~0.12.8"
 DataFrames = "~1.3.1"
 DataFramesMeta = "~0.10.0"
 Distributions = "~0.25.37"
+FreqTables = "~0.4.5"
 MCMCChains = "~5.0.3"
 StatsPlots = "~0.14.30"
 Turing = "~0.19.3"
@@ -274,6 +320,12 @@ deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll",
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
+
+[[CategoricalArrays]]
+deps = ["DataAPI", "Future", "Missings", "Printf", "Requires", "Statistics", "Unicode"]
+git-tree-sha1 = "c308f209870fdbd84cb20332b6dfaf14bf3387f8"
+uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+version = "0.10.2"
 
 [[Chain]]
 git-tree-sha1 = "339237319ef4712e6e5df7758d0bccddf5c237d9"
@@ -604,6 +656,12 @@ deps = ["ColorVectorSpace", "Colors", "FreeType", "GeometryBasics", "StaticArray
 git-tree-sha1 = "770050893e7bc8a34915b4b9298604a3236de834"
 uuid = "663a7486-cb36-511b-a19d-713bb74d65c9"
 version = "0.9.5"
+
+[[FreqTables]]
+deps = ["CategoricalArrays", "Missings", "NamedArrays", "Tables"]
+git-tree-sha1 = "488ad2dab30fd2727ee65451f790c81ed454666d"
+uuid = "da1fdf0e-e0ff-5433-a45f-9bb5ff651cb1"
+version = "0.4.5"
 
 [[FriBidi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1866,6 +1924,7 @@ version = "0.9.1+5"
 # ╠═68515502-17bf-446b-a7e1-3693ba09177b
 # ╠═0235dc72-eb85-4f47-9afe-a68220b8f72c
 # ╠═1bb051f4-9905-4196-a45d-8c5c30fd4d09
+# ╠═9b784668-3b23-4754-a29b-11d015297005
 # ╠═3fccd56e-c85d-41ea-9b48-91b7e8645b87
 # ╠═2597e326-d242-4de4-a8a3-b1fc21762239
 # ╠═8802e6a8-352c-4354-b624-05135f2f4edf
@@ -1880,5 +1939,15 @@ version = "0.9.1+5"
 # ╠═38073ed3-f53f-4ab9-8f2f-bd1f5c445e07
 # ╠═1da18839-432a-4250-a06b-5d8b13f57628
 # ╠═3659400e-1f64-4871-8087-3acb4a744d07
+# ╠═b2d964fd-fba7-4315-8fdc-8cf5011cc9fb
+# ╠═47d99c44-525d-4f7b-a5ea-a7f6ce8f2b29
+# ╠═5856d405-460f-4bf7-8894-3d3e1b77a027
+# ╠═d8a853a2-b4a4-4f9b-adf8-3c3e6ff7c158
+# ╠═e4bd31ee-a190-4125-9a78-269cabb8628c
+# ╠═27b1149b-c567-46ec-ac63-a194f936814a
+# ╠═810daeb1-3903-4b36-8a56-342bf96b5a0c
+# ╠═18adfc64-5ab4-4116-a77f-33a4539c24aa
+# ╠═29084eae-f9ff-4638-b742-edde1dd62c5a
+# ╠═9420ed21-23c6-49bb-aa4e-804abfcf9f3c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
