@@ -80,6 +80,7 @@ StatsPlots.plot(chain)
 # HMC/NUTS generates proposals to be rejected
 # Gibbs(PG(200, :θ, :Y)) takes 660 seconds
 # PG(50) takes 180 seconds
+# PG(300) takes 800 seconds
 chain2 = sample(model, PG(300), MCMCThreads(), 1500, 4)
 
 # ╔═╡ 1da18839-432a-4250-a06b-5d8b13f57628
